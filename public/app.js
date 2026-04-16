@@ -501,11 +501,7 @@ async function openEdit(id) {
   onTimeTypeChange();
   updateEditDateDisplay();
   updatePreview();
-  // 編集タブに戻す
-  document.querySelectorAll('.md-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.md-tab')[0].classList.add('active');
-  document.getElementById('fMemo').style.display = '';
-  document.getElementById('mdPreview').classList.remove('visible');
+  setMdTab('preview');
 
   document.getElementById('editModal').classList.add('open');
   document.getElementById('fTitle').focus();
@@ -628,11 +624,12 @@ function commitDateInput() {
 }
 
 // ===== MARKDOWN =====
-function switchMdTab(tab, el) {
+function setMdTab(tab) {
   document.querySelectorAll('.md-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
+  document.querySelector(`.md-tab[data-md-tab="${tab}"]`).classList.add('active');
   const textarea = document.getElementById('fMemo');
   const preview = document.getElementById('mdPreview');
+
   if (tab === 'preview') {
     updatePreview();
     textarea.style.display = 'none';
@@ -641,6 +638,10 @@ function switchMdTab(tab, el) {
     textarea.style.display = '';
     preview.classList.remove('visible');
   }
+}
+
+function switchMdTab(tab) {
+  setMdTab(tab);
 }
 
 function updatePreview() {

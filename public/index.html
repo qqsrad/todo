@@ -214,11 +214,11 @@
       <div class="form-row">
         <label>メモ（Markdown）</label>
         <div class="md-tabs">
-          <span class="md-tab active" onclick="switchMdTab('edit', this)">編集</span>
-          <span class="md-tab" onclick="switchMdTab('preview', this)">プレビュー</span>
+          <span class="md-tab" data-md-tab="edit" onclick="switchMdTab('edit')">編集</span>
+          <span class="md-tab active" data-md-tab="preview" onclick="switchMdTab('preview')">プレビュー</span>
         </div>
-        <textarea id="fMemo" placeholder="Markdownで入力..." oninput="updatePreview()"></textarea>
-        <div class="md-preview" id="mdPreview"></div>
+        <textarea id="fMemo" placeholder="Markdownで入力..." oninput="updatePreview()" style="display:none"></textarea>
+        <div class="md-preview visible" id="mdPreview"></div>
       </div>
     </div>
     <div class="modal-footer">
