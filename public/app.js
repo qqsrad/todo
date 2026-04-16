@@ -325,6 +325,8 @@ function makeSelectCell(todo, field, displayText, values, labels) {
   td.className = 'editable';
   td.textContent = displayText;
   td.addEventListener('click', () => {
+    if (td.querySelector('select')) return;
+
     const sel = document.createElement('select');
     sel.className = 'inline-select';
     values.forEach((v, i) => {
@@ -336,14 +338,17 @@ function makeSelectCell(todo, field, displayText, values, labels) {
     });
     td.textContent = '';
     td.appendChild(sel);
+    keepInlineSelectOpen(sel);
     sel.focus();
+    let changed = false;
     const save = async () => {
+      changed = true;
       const val = field === 'priority' ? parseInt(sel.value) : sel.value;
       await apiFetch(`/api/todos/${todo.id}/field`, { method: 'PATCH', body: JSON.stringify({ field, value: val || null }) });
       reload();
     };
     sel.addEventListener('change', save);
-    sel.addEventListener('blur', () => { setTimeout(reload, 100); });
+    sel.addEventListener('blur', () => { setTimeout(() => { if (!changed) reload(); }, 200); });
   });
   return td;
 }
@@ -387,35 +392,51 @@ async function startInlineDateEdit(td, todo) {
 }
 
 async function startInlineCatEdit(td, todo) {
+  if (td.querySelector('select')) return;
+
   const sel = document.createElement('select');
   sel.className = 'inline-select';
   sel.innerHTML = '<option value="">（未分類）</option>' +
     state.categories.map(c => `<option value="${c.id}" ${todo.category_id === c.id ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('');
   td.textContent = '';
   td.appendChild(sel);
+  keepInlineSelectOpen(sel);
   sel.focus();
+  let changed = false;
   const save = async () => {
+    changed = true;
     await apiFetch(`/api/todos/${todo.id}/field`, { method: 'PATCH', body: JSON.stringify({ field: 'category_id', value: sel.value || null }) });
     reload();
   };
   sel.addEventListener('change', save);
-  sel.addEventListener('blur', () => setTimeout(reload, 100));
+  sel.addEventListener('blur', () => setTimeout(() => { if (!changed) reload(); }, 200));
 }
 
 async function startInlineStatusEdit(td, todo) {
+  if (td.querySelector('select')) return;
+
   const sel = document.createElement('select');
   sel.className = 'inline-select';
   sel.innerHTML = Object.entries(STATUS_LABELS).map(([v,l]) =>
     `<option value="${v}" ${todo.status === v ? 'selected' : ''}>${l}</option>`).join('');
   td.textContent = '';
   td.appendChild(sel);
+  keepInlineSelectOpen(sel);
   sel.focus();
+  let changed = false;
   const save = async () => {
+    changed = true;
     await apiFetch(`/api/todos/${todo.id}/field`, { method: 'PATCH', body: JSON.stringify({ field: 'status', value: sel.value }) });
     reload();
   };
   sel.addEventListener('change', save);
-  sel.addEventListener('blur', () => setTimeout(reload, 100));
+  sel.addEventListener('blur', () => setTimeout(() => { if (!changed) reload(); }, 200));
+}
+
+function keepInlineSelectOpen(sel) {
+  ['click', 'mousedown', 'mouseup'].forEach((eventName) => {
+    sel.addEventListener(eventName, (event) => event.stopPropagation());
+  });
 }
 
 // ===== COMPLETE TOGGLE =====
