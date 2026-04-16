@@ -1,0 +1,6 @@
+node_modules/
+todo.db
+todo.db-shm
+todo.db-wal
+codex-server-out.log
+codex-server-err.log

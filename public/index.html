@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo管理</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <h1>📋 Todo</h1>
+  <button class="btn primary" onclick="openEdit()">＋ 新規</button>
+  <div class="toolbar-sep"></div>
+
+  <!-- 完了フィルタ -->
+  <div class="completion-filter">
+    <button class="btn active" data-completion="incomplete" onclick="setCompletion(this)">未完了</button>
+    <button class="btn" data-completion="done" onclick="setCompletion(this)">完了済み</button>
+    <button class="btn" data-completion="all" onclick="setCompletion(this)">すべて</button>
+  </div>
+  <div class="toolbar-sep"></div>
+
+  <!-- グループ化 -->
+  <select class="group-select" id="groupMode" onchange="reload()">
+    <option value="none">グループなし</option>
+    <option value="priority">優先度でグループ化</option>
+    <option value="deadline">期限でグループ化</option>
+  </select>
+  <div class="toolbar-sep"></div>
+
+  <!-- 検索 -->
+  <div class="search-wrap">
+    <input type="text" id="keyword" placeholder="🔍 検索..." oninput="debouncedReload()" style="min-width:140px">
+    <label><input type="checkbox" id="includeMemo" onchange="reload()"> メモも検索</label>
+  </div>
+  <div class="toolbar-sep"></div>
+
+  <button class="btn" onclick="toggleFilter()">フィルタ ▾</button>
+  <button class="btn" onclick="openCategories()">カテゴリ管理</button>
+  <button class="btn" onclick="exportCsv()">CSV出力</button>
+  <span class="count-info" id="countInfo"></span>
+</div>
+
+<!-- FILTER PANEL -->
+<div class="filter-panel" id="filterPanel">
+  <div class="filter-group">
+    <label>カテゴリ</label>
+    <select id="filterCategories" multiple size="4" onchange="reload()" style="min-width:120px"></select>
+  </div>
+  <div class="filter-group">
+    <label>ソース</label>
+    <div class="filter-row" id="filterSources"></div>
+  </div>
+  <div class="filter-group">
+    <label>優先度</label>
+    <div class="filter-row" id="filterPriorities"></div>
+  </div>
+  <div class="filter-group">
+    <label>ステータス</label>
+    <div class="filter-row" id="filterStatuses"></div>
+  </div>
+  <div class="filter-group">
+    <label>期限（プリセット）</label>
+    <select id="filterDeadlinePreset" onchange="reload()">
+      <option value="">すべて</option>
+      <option value="today">今日中</option>
+      <option value="3days">3日以内</option>
+      <option value="7days">7日以内</option>
+      <option value="2weeks">2週間以内</option>
+      <option value="1month">1ヶ月以内</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>期限（日付範囲）</label>
+    <div class="filter-row">
+      <input type="date" id="filterFrom" onchange="reload()">
+      <span>〜</span>
+      <input type="date" id="filterTo" onchange="reload()">
+    </div>
+  </div>
+  <div class="filter-group" style="align-self:flex-end">
+    <button class="btn" onclick="clearFilters()">フィルタクリア</button>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="table-wrap">
+  <table id="todoTable">
+    <thead>
+      <tr>
+        <th style="width:32px"></th>
+        <th data-col="title" onclick="setSort('title')">タイトル</th>
+        <th data-col="deadline" onclick="setSort('deadline')" style="width:140px">締め切り</th>
+        <th data-col="source" onclick="setSort('source')" style="width:90px">ソース</th>
+        <th data-col="requester" onclick="setSort('requester')" style="width:100px">振出人</th>
+        <th data-col="assignee" onclick="setSort('assignee')" style="width:100px">依頼先</th>
+        <th data-col="category" onclick="setSort('category')" style="width:100px">カテゴリ</th>
+        <th data-col="priority" onclick="setSort('priority')" style="width:70px">優先度</th>
+        <th data-col="status" onclick="setSort('status')" style="width:90px">ステータス</th>
+        <th data-col="created_at" onclick="setSort('created_at')" style="width:120px">登録日時</th>
+        <th style="width:70px">操作</th>
+      </tr>
+    </thead>
+    <tbody id="todoBody"></tbody>
+  </table>
+  <div class="empty-msg" id="emptyMsg" style="display:none">Todoがありません</div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="editTitle">新規Todo</h2>
+      <button class="modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>タイトル <span style="color:red">*</span></label>
+        <input type="text" id="fTitle" placeholder="タイトルを入力">
+      </div>
+      <div class="form-grid form-grid-2">
+        <div class="form-row">
+          <label>締め切り日</label>
+          <div class="deadline-edit-wrap">
+            <button type="button" class="deadline-display-btn" id="fDateDisplay" onclick="openDateEditor(true)">未設定</button>
+            <div class="deadline-input-wrap" id="fDateInputWrap" hidden>
+              <input type="date" id="fDate" onchange="commitDateInput()">
+            </div>
+            <button type="button" class="calendar-open-btn" onclick="openDateEditor(true)" aria-label="締め切り日を編集">📅</button>
+          </div>
+          <div class="deadline-editor-panel" id="fDateEditor" hidden>
+            <div class="preset-btns">
+            <button class="preset-btn" onclick="applyPreset('today')">今日中</button>
+            <button class="preset-btn" onclick="applyPreset('thisweek')">今週中</button>
+            <button class="preset-btn" onclick="applyPreset('nextweek')">来週中</button>
+            <button class="preset-btn" onclick="applyPreset('thismonth')">今月中</button>
+            <button class="preset-btn" onclick="applyPreset('thisq')">今Q中</button>
+            <button class="preset-btn" onclick="applyPreset('thisterm')">今期中</button>
+            <button class="preset-btn" onclick="applyPreset('thisyear')">今年度中</button>
+            <button class="preset-btn" onclick="applyPreset(null)">クリア</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>時刻</label>
+          <div class="time-row">
+            <select id="fTimeType" onchange="onTimeTypeChange()">
+              <option value="none">指定なし</option>
+              <option value="start">始業 (08:50)</option>
+              <option value="custom">時刻指定</option>
+              <option value="end">定時内 (17:20)</option>
+              <option value="eod">EoD (23:59)</option>
+            </select>
+            <input type="time" id="fTime" style="display:none">
+          </div>
+        </div>
+      </div>
+      <div class="form-grid form-grid-3">
+        <div class="form-row">
+          <label>ソース</label>
+          <select id="fSource">
+            <option value="">（なし）</option>
+            <option>メール</option>
+            <option>チャット</option>
+            <option>Teams</option>
+            <option>口頭</option>
+            <option>その他</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>振出人</label>
+          <input type="text" id="fRequester" list="requesterOptions" placeholder="依頼を出した人">
+          <datalist id="requesterOptions"></datalist>
+        </div>
+        <div class="form-row">
+          <label>依頼先</label>
+          <input type="text" id="fAssignee" list="assigneeOptions" placeholder="依頼先">
+          <datalist id="assigneeOptions"></datalist>
+        </div>
+      </div>
+      <div class="form-grid form-grid-3">
+        <div class="form-row">
+          <label>カテゴリ</label>
+          <select id="fCategory">
+            <option value="">（未分類）</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>優先度</label>
+          <select id="fPriority">
+            <option value="-1">非表示</option>
+            <option value="0">低優先</option>
+            <option value="1" selected>普通</option>
+            <option value="2">重要</option>
+            <option value="3">超重要</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>ステータス</label>
+          <select id="fStatus">
+            <option value="undecided">未決定</option>
+            <option value="todo" selected>未着手</option>
+            <option value="in_progress">着手済み</option>
+            <option value="requested">依頼中</option>
+            <option value="almost">あと少し</option>
+            <option value="done">完了</option>
+            <option value="hold">保留</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>メモ（Markdown）</label>
+        <div class="md-tabs">
+          <span class="md-tab active" onclick="switchMdTab('edit', this)">編集</span>
+          <span class="md-tab" onclick="switchMdTab('preview', this)">プレビュー</span>
+        </div>
+        <textarea id="fMemo" placeholder="Markdownで入力..." oninput="updatePreview()"></textarea>
+        <div class="md-preview" id="mdPreview"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEdit()">キャンセル</button>
+      <button class="btn danger" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteTodo()">削除</button>
+      <button class="btn primary" onclick="saveTodo()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATEGORY MODAL -->
+<div class="modal-overlay" id="catModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2>カテゴリ管理</h2>
+      <button class="modal-close" onclick="closeCategories()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" id="newCatName" placeholder="新しいカテゴリ名" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px">
+        <button class="btn primary" onclick="addCategory()">追加</button>
+      </div>
+      <ul class="cat-list" id="catList"></ul>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:8px">ドラッグ＆ドロップで並び替えできます</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" onclick="closeCategories()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <h2>CSVエクスポート</h2>
+      <button class="modal-close" onclick="document.getElementById('exportModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px">エクスポート対象を選択してください。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="document.getElementById('exportModal').classList.remove('open')">キャンセル</button>
+      <button class="btn" onclick="doExport('filtered')">表示中のみ</button>
+      <button class="btn primary" onclick="doExport('all')">全件</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="utils.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
