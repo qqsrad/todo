@@ -10,6 +10,7 @@ let state = {
   groupMode: 'none',
   collapsedGroups: new Set(),
   editId: null,
+  lastTimeType: 'none',
 };
 
 // ===== INIT =====
@@ -26,7 +27,7 @@ async function loadLastTimeType() {
   try {
     const r = await apiFetch('/api/settings/last_time_type');
     if (r.value) document.getElementById('fTimeType').value = r.value;
-    onTimeTypeChange();
+    syncTimeTypeControl();
   } catch {}
 }
 
@@ -519,7 +520,7 @@ async function openEdit(id) {
   }
 
   closeDateEditor();
-  onTimeTypeChange();
+  syncTimeTypeControl();
   updateEditDateDisplay();
   updatePreview();
   setMdTab('preview');
@@ -607,8 +608,28 @@ function applyPreset(preset) {
 
 // ===== TIME TYPE =====
 function onTimeTypeChange() {
+  updateTimeTypeControl({ applyCustomDefault: true });
+}
+
+function syncTimeTypeControl() {
+  updateTimeTypeControl({ applyCustomDefault: false });
+}
+
+function updateTimeTypeControl({ applyCustomDefault }) {
   const t = document.getElementById('fTimeType').value;
-  document.getElementById('fTime').style.display = t === 'custom' ? 'inline-block' : 'none';
+  const timeInput = document.getElementById('fTime');
+
+  if (applyCustomDefault && t === 'custom') {
+    const defaultTime = getTimeTypeDefault(state.lastTimeType);
+    timeInput.value = defaultTime || '';
+  }
+
+  timeInput.style.display = t === 'custom' ? 'inline-block' : 'none';
+  state.lastTimeType = t;
+}
+
+function getTimeTypeDefault(timeType) {
+  return TIME_TYPES.find(item => item.value === timeType)?.time || '';
 }
 
 function updateEditDateDisplay() {
